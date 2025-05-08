@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issue Reporting Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-container {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="url"], select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .preview {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px dashed #ccc;
+            border-radius: 8px;
+            display: none;
+        }
+        .preview img {
+            max-width: 100%;
+            margin-top: 10px;
+        }
+        .severity-low {
+            color: green;
+            font-weight: bold;
+        }
+        .severity-medium {
+            color: orange;
+            font-weight: bold;
+        }
+        .severity-high {
+            color: red;
+            font-weight: bold;
+        }
+        .severity-critical {
+            color: darkred;
+            font-weight: bold;
+        }
+        .optional {
+            color: #666;
+            font-style: italic;
+        }
+        .url-entry {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .url-entry input {
+            flex: 1;
+        }
+        .url-entry button {
+            width: 40px;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <form id="issueForm">
+            <div class="form-group">
+                <label for="name">Name/Title:</label>
+                <input type="text" id="name" name="name" required placeholder="Enter issue name or title">
+            </div>
+            
+            <div class="form-group">
+                <label>URL <span class="optional">(optional)</span>:</label>
+                <div id="urlFields">
+                    <div class="url-entry">
+                        <input type="url" name="url" placeholder="https://example.com">
+                        <button type="button" onclick="addUrlField()">&#43;</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="severity">Severity:</label>
+                <select id="severity" name="severity" required>
+                    <option value="">Select Severity</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="details">Details <span class="optional">(description or remediation)</span>:</label>
+                <textarea id="details" name="details" placeholder="Enter either description or remediation text"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="solution">Solution:</label>
+                <textarea id="solution" name="solution" required placeholder="Recommended solution"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="screenshot">Screenshot <span class="optional">(optional)</span>:</label>
+                <input type="file" id="screenshot" name="screenshot" accept="image/*">
+            </div>
+            
+            <button type="button" onclick="generatePDF()">Download PDF</button>
+            <button type="button" onclick="clearForm()">Clear Form</button>
+        </form>
+    </div>
+    
+    <div id="pdfPreview" class="preview">
+        <h2><span id="previewName"></span></h2>
+        <p><strong>URLs:</strong> <span id="previewUrl"></span></p>
+        <p><strong>Severity:</strong> <span id="previewSeverity"></span></p>
+        <p><strong>Details:</strong></p>
+        <div id="previewDetails"></div>
+        <p><strong>Solution:</strong></p>
+        <div id="previewSolution"></div>
+        <div id="previewImage"></div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        function generatePDF() {
+            const name = document.getElementById('name').value;
+            const severity = document.getElementById('severity').value;
+            const details = document.getElementById('details').value;
+            const solution = document.getElementById('solution').value;
+            const screenshot = document.getElementById('screenshot').files[0];
+
+            if (!name || !severity || !solution) {
+                alert('Please fill all required fields (Name, Severity, and Solution)');
+                return;
+            }
+
+            // Get all URLs
+            const urlInputs = document.querySelectorAll('#urlFields input[name="url"]');
+            const urls = Array.from(urlInputs).map(input => input.value).filter(Boolean);
+            document.getElementById('previewUrl').textContent = urls.length ? urls.join(', ') : 'Not specified';
+
+            document.getElementById('previewName').textContent = name;
+
+            const severityText = severity.charAt(0).toUpperCase() + severity.slice(1);
+            const severitySpan = document.getElementById('previewSeverity');
+            severitySpan.textContent = severityText;
+            severitySpan.className = `severity-${severity}`;
+
+            document.getElementById('previewDetails').textContent = details || 'Not provided';
+            document.getElementById('previewSolution').textContent = solution;
+
+            const previewImage = document.getElementById('previewImage');
+            previewImage.innerHTML = '';
+
+            if (screenshot) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    previewImage.appendChild(img);
+                    document.getElementById('pdfPreview').style.display = 'block';
+                    setTimeout(createPDF, 100);
+                };
+                reader.readAsDataURL(screenshot);
+            } else {
+                document.getElementById('pdfPreview').style.display = 'block';
+                setTimeout(createPDF, 100);
+            }
+        }
+
+        function createPDF() {
+            const preview = document.getElementById('pdfPreview');
+            const name = document.getElementById('name').value;
+
+            html2canvas(preview).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 295;
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                pdf.save(`${name}.pdf`);
+                document.getElementById('pdfPreview').style.display = 'none';
+            });
+        }
+
+        function clearForm() {
+            document.getElementById('issueForm').reset();
+            const urlContainer = document.getElementById('urlFields');
+            urlContainer.innerHTML = `
+                <div class="url-entry">
+                    <input type="url" name="url" placeholder="https://example.com">
+                    <button type="button" onclick="addUrlField()">&#43;</button>
+                </div>
+            `;
+        }
+
+        function addUrlField() {
+            const container = document.getElementById('urlFields');
+            const div = document.createElement('div');
+            div.className = 'url-entry';
+            div.innerHTML = `<input type="url" name="url" placeholder="https://example.com">`;
+            container.appendChild(div);
+        }
+    </script>
+</body>
+</html>
